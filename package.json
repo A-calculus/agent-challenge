@@ -5,10 +5,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy:agent": "nosana job post --file ./nos_job_def/nosana_mastra.json --market nvidia-3090 --timeout 30",
-    "deploy:qwen": "nosana job post --file ./nos_job_def/qwen_nos_jb.json --market nvidia-3090 --timeout 30",
-    "dev": "mastra dev",
+    "dev": "concurrently \"mastra dev\" \"pnpm run mcp:server\"",
     "build": "mastra build",
-    "start": "mastra start",
+    "start": "concurrently \"mastra start\" \"pnpm run mcp:server\"",
+    "mcp:server": "npx tsx src/mastra/mcp/mcp-server.ts",
+    "mcp:client": "npx tsx src/mastra/mcp/mcp-client.ts",
     "lint": "biome lint ./src",
     "format": "biome format ./src/** --write",
     "check": "biome check ./src"
@@ -22,20 +23,25 @@
     "node": ">=20.9.0"
   },
   "dependencies": {
+    "@ai-sdk/google": "^1.0.11",
+    "@ai-sdk/mistral": "^1.0.7",
     "@ai-sdk/openai": "^1.3.22",
     "@mastra/core": "^0.10.5",
     "@mastra/libsql": "^0.10.2",
     "@mastra/loggers": "^0.10.2",
+    "@mastra/mcp": "^0.10.6",
     "@mastra/memory": "^0.10.3",
     "dotenv": "^16.5.0",
-    "ollama-ai-provider": "^1.2.0",
     "zod": "^3.25.67"
   },
   "devDependencies": {
     "@biomejs/biome": "2.0.4",
     "@nosana/cli": "^1.0.52",
     "@types/node": "^24.0.3",
+    "concurrently": "^8.2.2",
     "mastra": "^0.10.5",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
-  }
+  },
+  "packageManager": "pnpm@10.12.1+sha512.f0dda8580f0ee9481c5c79a1d927b9164f2c478e90992ad268bbb2465a736984391d6333d2c327913578b2804af33474ca554ba29c04a8b13060a717675ae3ac"
 }

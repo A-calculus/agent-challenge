@@ -22,7 +22,7 @@ interface WeatherResponse {
 
 export const weatherTool = createTool({
 	id: "get-weather",
-	description: "Get current weather for a location",
+	description: "Get current weather information for a specified location, including humidity, wind conditions, and precipitation. Always ask for a location if none is provided, translate non-English names, and use the most relevant part of multi-part locations.",
 	inputSchema: z.object({
 		location: z.string().describe("City name"),
 	}),

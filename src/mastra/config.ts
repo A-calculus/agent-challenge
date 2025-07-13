@@ -1,18 +1,28 @@
+import { mistral } from "@ai-sdk/mistral";
+import { google } from "@ai-sdk/google";
 import dotenv from "dotenv";
-import { createOllama } from "ollama-ai-provider";
 
 // Load environment variables once at the beginning
 dotenv.config();
 
 // Export all your environment variables
-// Defaults to Ollama qwen2.5:1.5b
-// https://ollama.com/library/qwen2.5
-export const modelName = process.env.MODEL_NAME_AT_ENDPOINT ?? "qwen2.5:1.5b";
-export const baseURL = process.env.API_BASE_URL ?? "http://127.0.0.1:11434/api";
 
-// Create and export the model instance
-export const model = createOllama({ baseURL }).chat(modelName, {
-  simulateStreaming: true,
-});
+export const mistralApiKey = process.env.MISTRAL ?? "1234567890";
+export const geminiApiKey = process.env.GEMINI ?? "1234567890";
 
-console.log(`ModelName: ${modelName}\nbaseURL: ${baseURL}`);
+export const mistralModel = process.env.MM ?? "mistral-large-latest";
+export const geminiModel = process.env.GM ?? "gemini-1.5-pro";
+
+// Set environment variables for the AI SDK providers
+
+process.env.MISTRAL_API_KEY = mistralApiKey;
+process.env.GOOGLE_GENERATIVE_AI_API_KEY = geminiApiKey;
+
+export const mistralModelInstance = mistral(mistralModel);
+export const geminiModelInstance = google(geminiModel);
+
+// Set Mistral as the default model for backward compatibility
+export const model = mistralModelInstance;
+
+console.log(`Mistral Model: ${mistralModel}`);
+console.log(`Gemini Model: ${geminiModel}`);
