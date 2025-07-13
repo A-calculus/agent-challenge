@@ -12,7 +12,7 @@ const dbPath = join(memoryDir, "tokenomics-advisor.db");
 try {
   mkdirSync(memoryDir, { recursive: true });
 } catch (error) {
-  // Directory might already exist, ignore error
+  console.error("Error creating memory directory:", error);
 }
 
 // Configure memory for the tokenomics advisor agent
@@ -30,9 +30,6 @@ export const tokenomicsAdvisorMemory = new Memory({
   },
   // Memory processors for token optimization
   processors: [
-    // Use TokenLimiter optimized for Mistral models
-    // Mistral-small-latest has ~32k context window, so we limit memory to ~20k tokens
-    // leaving room for the current message and response
-    new TokenLimiter(20000),
+    new TokenLimiter(10000),
   ],
 }); 

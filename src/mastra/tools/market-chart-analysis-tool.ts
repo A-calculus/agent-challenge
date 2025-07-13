@@ -122,7 +122,6 @@ function performAnalysis(data: AnalysisData): CalculatedMetrics {
 	const volumes = data.volumes.map((v) => v.value);
 	const marketCaps = data.marketCaps.map((m) => m.value);
 
-	// Price metrics
 	const current = prices[prices.length - 1];
 	const highest = Math.max(...prices);
 	const lowest = Math.min(...prices);
@@ -140,14 +139,12 @@ function performAnalysis(data: AnalysisData): CalculatedMetrics {
 	const averageDailyReturn =
 		dailyReturns.reduce((sum, r) => sum + r, 0) / dailyReturns.length;
 
-	// Volume metrics
 	const currentVolume = volumes[volumes.length - 1];
 	const highestVolume = Math.max(...volumes);
 	const lowestVolume = Math.min(...volumes);
 	const averageVolume = volumes.reduce((sum, v) => sum + v, 0) / volumes.length;
 	const totalVolume = volumes.reduce((sum, v) => sum + v, 0);
 
-	// Market cap metrics
 	const currentMarketCap = marketCaps[marketCaps.length - 1];
 	const highestMarketCap = Math.max(...marketCaps);
 	const lowestMarketCap = Math.min(...marketCaps);

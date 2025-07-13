@@ -111,7 +111,6 @@ interface CalculatedMetrics {
 	};
 }
 
-// Helper functions for calculations
 function calculateSupplyMetrics(
 	data: TokenAnalysisData,
 ): CalculatedMetrics["supplyMetrics"] {
@@ -167,12 +166,12 @@ function calculateUnlockAnalysis(
 		};
 	}
 
-	// Filter future unlocks
+	
 	const futureUnlocks = releaseSchedule.filter(
 		(unlock) => unlock.unlock_date > currentTime,
 	);
 
-	// Sort by date
+	
 	futureUnlocks.sort((a, b) => a.unlock_date - b.unlock_date);
 
 	const totalUnlockingTokens = futureUnlocks.reduce(
@@ -401,7 +400,6 @@ export const tokenMetadataAnalysisTool = createTool({
 
 			const data = apiData.data;
 
-			// Transform data for analysis
 			const analysisData: TokenAnalysisData = {
 				basicInfo: {
 					name: data.name,
@@ -427,10 +425,8 @@ export const tokenMetadataAnalysisTool = createTool({
 				listedAt: data.listed_at,
 			};
 
-			// Perform comprehensive analysis
 			const metrics = performAnalysis(analysisData);
 
-			// Format analysis for terminal display
 			const hasUnlockSchedule = analysisData.releaseSchedule.length > 0;
 			const hasDistribution = analysisData.distribution.length > 0;
 

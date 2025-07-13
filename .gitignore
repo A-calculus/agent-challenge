@@ -4,3 +4,7 @@ dist
 .mastra
 *.db
 *.db-*
+.env*
+*.env
+test-tokenomics-tool.ts
+
