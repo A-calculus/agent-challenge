@@ -38,6 +38,8 @@ LICENSE
 # Docker
 Dockerfile
 .dockerignore
+.agents/*
+*.txt
 
 # Temporary files
 *.tmp

@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Your Privora Rubric",
+  "version": "0.1.0",
+  "description": "Autonomous privacy policy guardian (Privora).",
+  "action": {
+    "default_title": "Privora",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["storage", "tabs", "notifications"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+

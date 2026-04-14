@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privora</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <div class="title">Privora</div>
+        <div class="subtitle">Browser Sentinel</div>
+      </div>
+
+      <div id="view-onboarding" class="card">
+        <div class="h">First run setup</div>
+        <div class="p">Connect wallet (devnet), then configure your model endpoint.</div>
+
+        <button id="btn-connect" class="btn">Connect Wallet</button>
+        <div id="wallet-status" class="muted"></div>
+
+        <div class="divider"></div>
+
+        <label class="label">Provider</label>
+        <select id="provider" class="input">
+          <option value="ollama">Ollama (local)</option>
+          <option value="openai_compat">OpenAI-compatible endpoint</option>
+        </select>
+
+        <label class="label">Base URL</label>
+        <input id="baseUrl" class="input" placeholder="http://localhost:11434/v1" />
+
+        <label class="label">API Key</label>
+        <input id="apiKey" class="input" placeholder="ollama" />
+
+        <label class="label">Small model</label>
+        <input id="smallModel" class="input" placeholder="llama3.1:8b" />
+
+        <label class="label">Large model</label>
+        <input id="largeModel" class="input" placeholder="llama3.1:70b" />
+
+        <label class="label">Embedding model</label>
+        <input id="embeddingModel" class="input" placeholder="nomic-embed-text" />
+
+        <label class="label">Embedding dimensions</label>
+        <input id="embeddingDimensions" class="input" placeholder="768" />
+
+        <div class="row">
+          <button id="btn-validate" class="btn secondary">Validate</button>
+          <button id="btn-save" class="btn" disabled>Save</button>
+        </div>
+        <div id="validate-status" class="muted"></div>
+      </div>
+
+      <div id="view-dashboard" class="card hidden">
+        <div class="h">Deployment dashboard</div>
+        <div class="p">Endpoint and billing visibility live here.</div>
+
+        <div class="kv">
+          <div class="k">Wallet</div>
+          <div id="dash-wallet" class="v"></div>
+        </div>
+        <div class="kv">
+          <div class="k">Backend</div>
+          <div id="dash-backend" class="v"></div>
+        </div>
+        <div class="kv">
+          <div class="k">Deployment endpoint</div>
+          <div id="dash-endpoint" class="v"></div>
+        </div>
+
+        <div class="row">
+          <button id="btn-deploy" class="btn">Deploy on Nosana</button>
+          <button id="btn-refresh" class="btn secondary">Refresh</button>
+        </div>
+        <div id="dash-status" class="muted"></div>
+      </div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
+

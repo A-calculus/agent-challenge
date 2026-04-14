@@ -1,0 +1,9 @@
+{
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "privora@local",
+      "strict_min_version": "109.0"
+    }
+  }
+}
+

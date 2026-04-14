@@ -1,0 +1,500 @@
+// src/actions/webSearch.ts
+import {
+  logger,
+  ModelType,
+  composePromptFromState,
+  parseKeyValueXml
+} from "@elizaos/core";
+var DEFAULT_MAX_WEB_SEARCH_CHARS = 16e3;
+function buildExtractionTemplate(conversationContext) {
+  return `# Web Search Parameter Extraction
+
+## Recent Conversation
+${conversationContext}
+
+## Task
+Extract the search query and parameters from the conversation above. The user wants to search the web for information.
+
+## Instructions
+- Determine the exact search query the user wants
+- If the topic is about crypto, DeFi, finance, or markets, set topic to "finance"
+- Only include optional parameters if clearly indicated by the user
+
+Respond ONLY with the following XML format:
+<response>
+    <reasoning>
+        Step 1: Identify what information the user is looking for
+        Step 2: Determine the best search query to find this information
+        Step 3: Classify the topic based on the subject matter
+    </reasoning>
+    <query>the exact query to search</query>
+    <topic>general or finance</topic>
+</response>`;
+}
+function MaxTokens(data, maxTokens = DEFAULT_MAX_WEB_SEARCH_CHARS) {
+  return data.length > maxTokens ? data.slice(0, maxTokens) : data;
+}
+async function extractSearchParams(runtime, message, _state) {
+  var _a, _b, _c, _d, _e, _f, _g, _h;
+  const composedState = await runtime.composeState(
+    message,
+    ["ACTION_STATE"],
+    true
+  );
+  const stateParams = ((_a = composedState == null ? void 0 : composedState.data) == null ? void 0 : _a.actionParams) || ((_b = composedState == null ? void 0 : composedState.data) == null ? void 0 : _b.webSearch) || ((_c = composedState == null ? void 0 : composedState.data) == null ? void 0 : _c.websearch) || {};
+  if ((_d = stateParams == null ? void 0 : stateParams.query) == null ? void 0 : _d.trim()) {
+    logger.info(
+      { src: "webSearch:extractParams", source: "actionParams" },
+      "Using params from state"
+    );
+    return stateParams;
+  }
+  logger.info(
+    { src: "webSearch:extractParams", source: "llm" },
+    "Extracting params via LLM"
+  );
+  try {
+    const extractionState = await runtime.composeState(
+      message,
+      ["RECENT_MESSAGES"],
+      true
+    );
+    const conversationLog = (_e = extractionState == null ? void 0 : extractionState.values) == null ? void 0 : _e.conversationLog;
+    const recentMessages = (_f = extractionState == null ? void 0 : extractionState.values) == null ? void 0 : _f.recentMessages;
+    const conversationContext = typeof conversationLog === "string" && conversationLog.trim() || typeof recentMessages === "string" && recentMessages.trim() || "";
+    const contextSource = typeof conversationLog === "string" && conversationLog.trim() ? "conversationLog" : "recentMessages";
+    logger.debug(
+      { src: "webSearch:extractParams", contextSource },
+      "Using conversation context"
+    );
+    const template = buildExtractionTemplate(conversationContext);
+    const prompt = composePromptFromState({
+      state: extractionState,
+      template
+    });
+    const response = await runtime.useModel(ModelType.TEXT_SMALL, { prompt });
+    const parsed = parseKeyValueXml(response || "");
+    if (parsed == null ? void 0 : parsed.query) {
+      const extractedParams = {
+        query: String(parsed.query).trim(),
+        topic: parsed.topic === "finance" ? "finance" : "general"
+      };
+      logger.info(
+        { src: "webSearch:extractParams", query: extractedParams.query },
+        "Extracted query via LLM"
+      );
+      return extractedParams;
+    }
+  } catch (err) {
+    logger.warn(
+      { src: "webSearch:extractParams", error: err.message },
+      "LLM extraction failed, falling back to message text"
+    );
+  }
+  const messageText = (_h = (_g = message.content) == null ? void 0 : _g.text) == null ? void 0 : _h.trim();
+  if (messageText) {
+    logger.info(
+      { src: "webSearch:extractParams", source: "messageText" },
+      "Using message text as query"
+    );
+    return { query: messageText };
+  }
+  return {};
+}
+var webSearch = {
+  name: "WEB_SEARCH",
+  similes: [
+    "SEARCH_WEB",
+    "INTERNET_SEARCH",
+    "LOOKUP",
+    "QUERY_WEB",
+    "FIND_ONLINE",
+    "SEARCH_ENGINE",
+    "WEB_LOOKUP",
+    "ONLINE_SEARCH",
+    "FIND_INFORMATION"
+  ],
+  suppressInitialMessage: true,
+  description: "Search the web using Tavily. Supports general web search and finance topics (crypto/DeFi/markets). Use when other actions/providers can't provide accurate or current info.\n\nIMPORTANT - Result Quality Check:\n- If search returns off-topic or poor results, RETRY with parameter adjustments in the SAME round\n- Try: topic='finance' for crypto/markets, source filter (theblock.com, coindesk.com), broader time_range, advanced search_depth, or rephrased query\n- For crypto/DeFi content: use topic='finance' + source from [theblock.com, coindesk.com, decrypt.co, dlnews.com]\n- Don't give up after one attempt if results are clearly irrelevant",
+  // Parameter schema for tool calling
+  parameters: {
+    query: {
+      type: "string",
+      description: "The search query to look up on the web",
+      required: true
+    },
+    topic: {
+      type: "string",
+      description: "Search topic: 'general' for web search, 'finance' for financial/crypto/DeFi content. Defaults to 'general'.",
+      required: false
+    },
+    source: {
+      type: "string",
+      description: "Specific source domain to limit results (e.g., 'bloomberg.com', 'reuters.com'). Uses site: operator.",
+      required: false
+    },
+    max_results: {
+      type: "number",
+      description: "Maximum number of results to return (1-20). Defaults to 5.",
+      required: false
+    },
+    search_depth: {
+      type: "string",
+      description: "Search depth: 'basic' for quick results or 'advanced' for comprehensive search. Defaults to 'basic'.",
+      required: false
+    },
+    time_range: {
+      type: "string",
+      description: "Time range filter: 'day', 'week', 'month', 'year' (or 'd', 'w', 'm', 'y')",
+      required: false
+    },
+    start_date: {
+      type: "string",
+      description: "Start date filter in YYYY-MM-DD format (returns results after this date)",
+      required: false
+    },
+    end_date: {
+      type: "string",
+      description: "End date filter in YYYY-MM-DD format (returns results before this date)",
+      required: false
+    }
+  },
+  validate: async (runtime, _message, _state) => {
+    try {
+      const service = runtime.getService("TAVILY");
+      return !!service;
+    } catch (err) {
+      logger.warn(
+        { src: "webSearch:validate", error: err.message },
+        "TavilyService not available"
+      );
+      return false;
+    }
+  },
+  handler: async (runtime, message, state, _options, callback) => {
+    var _a, _b;
+    try {
+      const tavilyService = runtime.getService("TAVILY");
+      if (!tavilyService) {
+        throw new Error("TavilyService not initialized");
+      }
+      const params = await extractSearchParams(runtime, message, state);
+      const query = (_a = params == null ? void 0 : params.query) == null ? void 0 : _a.trim();
+      if (!query) {
+        const errorMsg = "Missing required parameter 'query'. Please specify what to search for.";
+        logger.error({ src: "webSearch:handler" }, errorMsg);
+        const emptyResult = {
+          text: errorMsg,
+          success: false,
+          data: {
+            actionName: "WEB_SEARCH"
+          },
+          error: "missing_required_parameter"
+        };
+        if (callback) {
+          callback({
+            text: emptyResult.text,
+            content: { error: "missing_required_parameter", details: errorMsg }
+          });
+        }
+        return emptyResult;
+      }
+      const source = (_b = params == null ? void 0 : params.source) == null ? void 0 : _b.trim();
+      const topic = (params == null ? void 0 : params.topic) === "finance" ? "finance" : "general";
+      const maxResults = (params == null ? void 0 : params.max_results) ? Math.min(Math.max(1, params.max_results), 20) : 5;
+      const searchDepth = (params == null ? void 0 : params.search_depth) === "advanced" ? "advanced" : "basic";
+      let enhancedQuery = query;
+      if (source) {
+        enhancedQuery = `${query} site:${source}`;
+        logger.info(
+          { src: "webSearch:handler", source },
+          "Searching with source filter"
+        );
+      }
+      logger.info(
+        { src: "webSearch:handler", query: enhancedQuery, topic },
+        "Executing web search"
+      );
+      const inputParams = {
+        query,
+        topic,
+        source,
+        max_results: maxResults,
+        search_depth: searchDepth,
+        time_range: params == null ? void 0 : params.time_range,
+        start_date: params == null ? void 0 : params.start_date,
+        end_date: params == null ? void 0 : params.end_date
+      };
+      const searchResponse = await tavilyService.search(enhancedQuery, {
+        topic,
+        max_results: maxResults,
+        search_depth: searchDepth,
+        time_range: params == null ? void 0 : params.time_range,
+        start_date: params == null ? void 0 : params.start_date,
+        end_date: params == null ? void 0 : params.end_date,
+        include_answer: true,
+        include_images: false
+      });
+      if (searchResponse && searchResponse.results.length) {
+        const responseList = searchResponse.answer ? `${searchResponse.answer}${Array.isArray(searchResponse.results) && searchResponse.results.length > 0 ? `
+
+For more details, you can check out these resources:
+${searchResponse.results.map(
+          (result2, index) => `${index + 1}. [${result2.title}](${result2.url})`
+        ).join("\n")}` : ""}` : "";
+        const result = {
+          text: MaxTokens(responseList, DEFAULT_MAX_WEB_SEARCH_CHARS),
+          success: true,
+          data: {
+            ...searchResponse,
+            actionName: "WEB_SEARCH"
+          },
+          input: inputParams
+        };
+        if (callback) {
+          callback({
+            text: result.text,
+            actions: ["WEB_SEARCH"],
+            data: result.data
+          });
+        }
+        return result;
+      }
+      const noResult = {
+        text: "I couldn't find relevant results for that query.",
+        success: false,
+        data: {
+          actionName: "WEB_SEARCH"
+        },
+        input: inputParams
+      };
+      if (callback) {
+        callback({ text: noResult.text });
+      }
+      return noResult;
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      logger.error(
+        { src: "webSearch:handler", error: errMsg },
+        "Action failed"
+      );
+      const errorResult = {
+        text: `Web search failed: ${errMsg}`,
+        success: false,
+        data: {
+          actionName: "WEB_SEARCH"
+        },
+        error: errMsg
+      };
+      if (callback) {
+        callback({
+          text: errorResult.text,
+          content: { error: "web_search_failed", details: errMsg }
+        });
+      }
+      return errorResult;
+    }
+  },
+  examples: [
+    [
+      {
+        name: "{{user}}",
+        content: {
+          text: "Latest Aave news"
+        }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Let me search for Aave news from crypto sources:",
+          action: "WEB_SEARCH",
+          actionParams: {
+            query: "Aave protocol",
+            topic: "finance",
+            source: "theblock.com",
+            time_range: "week"
+          }
+        }
+      }
+    ],
+    [
+      {
+        name: "{{user}}",
+        content: {
+          text: "Find the latest news about SpaceX launches."
+        }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Here is the latest news about SpaceX launches:",
+          action: "WEB_SEARCH"
+        }
+      }
+    ],
+    [
+      {
+        name: "{{user}}",
+        content: {
+          text: "Can you find details about the iPhone 16 release?"
+        }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Here are the details I found about the iPhone 16 release:",
+          action: "WEB_SEARCH"
+        }
+      }
+    ],
+    [
+      {
+        name: "{{user}}",
+        content: {
+          text: "What is the schedule for the next FIFA World Cup?"
+        }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Here is the schedule for the next FIFA World Cup:",
+          action: "WEB_SEARCH"
+        }
+      }
+    ],
+    [
+      {
+        name: "{{user}}",
+        content: { text: "Check the latest stock price of Tesla." }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Here is the latest stock price of Tesla I found:",
+          action: "WEB_SEARCH"
+        }
+      }
+    ],
+    [
+      {
+        name: "{{user}}",
+        content: {
+          text: "What are the current trending movies in the US?"
+        }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Here are the current trending movies in the US:",
+          action: "WEB_SEARCH"
+        }
+      }
+    ],
+    [
+      {
+        name: "{{user}}",
+        content: {
+          text: "What is the latest score in the NBA finals?"
+        }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Here is the latest score from the NBA finals:",
+          action: "WEB_SEARCH"
+        }
+      }
+    ],
+    [
+      {
+        name: "{{user}}",
+        content: { text: "When is the next Apple keynote event?" }
+      },
+      {
+        name: "{{agent}}",
+        content: {
+          text: "Here is the information about the next Apple keynote event:",
+          action: "WEB_SEARCH"
+        }
+      }
+    ]
+  ]
+};
+
+// src/services/tavilyService.ts
+import { logger as logger2, Service } from "@elizaos/core";
+import { tavily } from "@tavily/core";
+var TavilyService = class _TavilyService extends Service {
+  static serviceType = "TAVILY";
+  tavilyClient;
+  constructor(runtime) {
+    super(runtime);
+  }
+  static async start(runtime) {
+    const service = new _TavilyService(runtime);
+    await service.initialize(runtime);
+    return service;
+  }
+  async initialize(runtime) {
+    const apiKey = runtime.getSetting("TAVILY_API_KEY");
+    if (!apiKey) {
+      throw new Error("TAVILY_API_KEY is not set");
+    }
+    this.tavilyClient = tavily({ apiKey });
+  }
+  get capabilityDescription() {
+    return "Web search via Tavily API. Supports answer synthesis and result listing with optional images.";
+  }
+  async stop() {
+  }
+  async search(query, options) {
+    try {
+      if (!this.tavilyClient) {
+        throw new Error("TavilyService not initialized");
+      }
+      const response = await this.tavilyClient.search(query, {
+        auto_parameters: options == null ? void 0 : options.auto_parameters,
+        topic: (options == null ? void 0 : options.topic) ?? "general",
+        search_depth: (options == null ? void 0 : options.search_depth) ?? "basic",
+        chunks_per_source: options == null ? void 0 : options.chunks_per_source,
+        max_results: (options == null ? void 0 : options.max_results) ?? 5,
+        time_range: options == null ? void 0 : options.time_range,
+        start_date: options == null ? void 0 : options.start_date,
+        end_date: options == null ? void 0 : options.end_date,
+        include_answer: (options == null ? void 0 : options.include_answer) ?? false,
+        include_raw_content: options == null ? void 0 : options.include_raw_content,
+        include_images: (options == null ? void 0 : options.include_images) ?? false,
+        include_image_descriptions: options == null ? void 0 : options.include_image_descriptions,
+        include_favicon: options == null ? void 0 : options.include_favicon,
+        include_domains: options == null ? void 0 : options.include_domains,
+        exclude_domains: options == null ? void 0 : options.exclude_domains,
+        country: options == null ? void 0 : options.country
+      });
+      return response;
+    } catch (error) {
+      logger2.error(
+        { src: "tavilyService:search", error: error.message },
+        "Tavily search error"
+      );
+      throw error;
+    }
+  }
+};
+
+// src/index.ts
+var webSearchPlugin = {
+  name: "webSearch",
+  description: "Search the web using Tavily",
+  actions: [webSearch],
+  evaluators: [],
+  providers: [],
+  services: [TavilyService],
+  clients: [],
+  adapters: []
+};
+var index_default = webSearchPlugin;
+export {
+  index_default as default,
+  webSearchPlugin
+};
+//# sourceMappingURL=index.js.map
